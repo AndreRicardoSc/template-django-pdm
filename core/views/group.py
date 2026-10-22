@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from core.models import Group, User
-from core.permissions import IsSuperuserOrReadOnly
+from core.permissions import IsSuperuser, ModelPermissions
 from core.serializers import GroupSerializer, GroupUsersSerializer, UserSerializer
 
 
@@ -18,7 +18,9 @@ class GroupViewSet(ModelViewSet):
 
     queryset = Group.objects.all().order_by('name')
     serializer_class = GroupSerializer
-    permission_classes = [IsAuthenticated, IsSuperuserOrReadOnly]
+    permission_classes = [IsAuthenticated, ModelPermissions]
+    # GET /api/groups/{id}/users/ devolve dados de usuários, então exige as duas permissões.
+    action_permissions = {'users': ['core.view_group', 'core.view_user']}
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['is_default']
     search_fields = ['name', 'slug', 'description']
@@ -57,11 +59,11 @@ class GroupViewSet(ModelViewSet):
 
     @extend_schema(
         summary='Adicionar usuários ao grupo',
-        description='Adiciona um ou mais usuários ao grupo.',
+        description='Adiciona um ou mais usuários ao grupo. Restrito a superusuários.',
         request=GroupUsersSerializer,
         responses={200: GroupSerializer},
     )
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsSuperuser])
     def add_users(self, request, pk=None):
         """Adiciona usuários ao grupo."""
         group = self.get_object()
@@ -75,11 +77,11 @@ class GroupViewSet(ModelViewSet):
 
     @extend_schema(
         summary='Remover usuários do grupo',
-        description='Remove um ou mais usuários do grupo.',
+        description='Remove um ou mais usuários do grupo. Restrito a superusuários.',
         request=GroupUsersSerializer,
         responses={200: GroupSerializer},
     )
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsSuperuser])
     def remove_users(self, request, pk=None):
         """Remove usuários do grupo."""
         group = self.get_object()

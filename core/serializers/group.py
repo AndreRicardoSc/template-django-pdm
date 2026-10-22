@@ -36,6 +36,16 @@ class GroupSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at']
 
+    def __init__(self, *args, **kwargs):
+        """Permissões concedem acesso: só superusuários podem alterá-las."""
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+
+        if not (user and user.is_superuser):
+            self.fields['permissions'].read_only = True
+
     def validate(self, attrs):
         """Gera o slug a partir do nome e garante um único grupo padrão."""
         attrs = super().validate(attrs)

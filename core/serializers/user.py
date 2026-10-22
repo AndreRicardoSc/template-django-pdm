@@ -54,7 +54,7 @@ class UserSerializer(ModelSerializer):
         request = self.context.get('request')
         user = getattr(request, 'user', None)
         is_superuser = bool(user and user.is_superuser)
-        is_staff = bool(user and user.is_staff)
+        is_manager = bool(user and (is_superuser or user.has_perm('core.change_user')))
 
         # Grupos concedem permissões, então só superusuários podem alterá-los.
         if not is_superuser:
@@ -62,7 +62,7 @@ class UserSerializer(ModelSerializer):
             self.fields['is_superuser'].read_only = True
             self.fields['groups'].read_only = True
 
-        if not is_staff:
+        if not is_manager:
             self.fields['is_active'].read_only = True
 
 

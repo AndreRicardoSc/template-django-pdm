@@ -7,21 +7,22 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from core.models import User
-from core.permissions import IsStaffForCreate
+from core.permissions import SelfUserPermission
 from core.serializers import UserRegistrationSerializer, UserSerializer
 
 
 class UserViewSet(ModelViewSet):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsStaffForCreate]
+    permission_classes = [IsAuthenticated, SelfUserPermission]
 
     def get_queryset(self):
-        """A equipe enxerga todos os usuários; os demais, apenas a si mesmos."""
+        """Permissões de gestão enxergam todos; os demais, apenas a si mesmos."""
         queryset = super().get_queryset()
         user = self.request.user
+        management_permissions = ('core.view_user', 'core.change_user', 'core.delete_user')
 
-        if user.is_staff or user.is_superuser:
+        if user.is_superuser or any(user.has_perm(permission) for permission in management_permissions):
             return queryset
 
         return queryset.filter(pk=user.pk)
@@ -38,7 +39,7 @@ class UserViewSet(ModelViewSet):
         serializer = UserSerializer(user, context=self.get_serializer_context())
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def _check_user_permission(self):
+    def _check_user_permission(self, permission, *, allow_self):
         user = self.request.user
         target_user = self.get_object()
 
@@ -46,7 +47,7 @@ class UserViewSet(ModelViewSet):
         if target_user.is_superuser and not user.is_superuser:
             return self._forbidden()
 
-        if user.is_superuser or user.is_staff or user.id == target_user.id:
+        if user.is_superuser or user.has_perm(permission) or (allow_self and user.id == target_user.id):
             return None
 
         return self._forbidden()
@@ -54,12 +55,12 @@ class UserViewSet(ModelViewSet):
     @staticmethod
     def _forbidden():
         return Response(
-            {'detail': 'Você não tem permissão para modificar este usuário.'},
+            {'detail': 'Você não tem permissão para alterar este usuário.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
     def update(self, request, *args, **kwargs):
-        response = self._check_user_permission()
+        response = self._check_user_permission('core.change_user', allow_self=True)
 
         if response:
             return response
@@ -67,7 +68,7 @@ class UserViewSet(ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
-        response = self._check_user_permission()
+        response = self._check_user_permission('core.change_user', allow_self=True)
 
         if response:
             return response
@@ -75,7 +76,7 @@ class UserViewSet(ModelViewSet):
         return super().partial_update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        response = self._check_user_permission()
+        response = self._check_user_permission('core.delete_user', allow_self=False)
 
         if response:
             return response

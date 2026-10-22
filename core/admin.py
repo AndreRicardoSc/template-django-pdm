@@ -84,6 +84,15 @@ class UserAdmin(BaseUserAdmin):
     )
     add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('email', 'password1', 'password2')}),)
 
+    def get_readonly_fields(self, request, obj=None):
+        """Conceder privilégio é exclusivo de superusuário, também no admin."""
+        readonly = super().get_readonly_fields(request, obj)
+
+        if request.user.is_superuser:
+            return readonly
+
+        return (*readonly, 'is_staff', 'is_superuser', 'groups', 'user_permissions')
+
 
 @admin.register(Group)
 class CoreGroupAdmin(BaseGroupAdmin):
@@ -93,6 +102,15 @@ class CoreGroupAdmin(BaseGroupAdmin):
     search_fields = ('name', 'slug', 'description')
     list_filter = ('is_default',)
     ordering = ('name',)
+
+    def get_readonly_fields(self, request, obj=None):
+        """Permissões concedem acesso: só superusuários podem alterá-las."""
+        readonly = super().get_readonly_fields(request, obj)
+
+        if request.user.is_superuser:
+            return readonly
+
+        return (*readonly, 'permissions')
 
 
 admin.site.register(User, UserAdmin)
